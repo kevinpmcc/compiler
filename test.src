@@ -1,5 +1,5 @@
-x = 5;
+a = 5;
 
-def newFunction(x, y, z) 
-  x
+def newFunction(z) 
+  a
 end
