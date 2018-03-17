@@ -1,3 +1,5 @@
+x = 5;
+
 def newFunction() 
-  1
+  x
 end

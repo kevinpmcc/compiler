@@ -8,7 +8,9 @@ class Tokenizer
     [:integer, /\b[0-9]+\b/],
     [:var_name, /\b[a-zA-Z]+\b/],
     [:open_paren, /\(/],
-    [:close_paren, /\)/]
+    [:close_paren, /\)/],
+    [:assignment_operator, /\=/],
+    [:expression_terminator, /\;/]
   ] 
 
   def initialize(code)
@@ -45,6 +47,20 @@ class Parser
   end
 
   def parse
+    nodes = []
+    nodes << parse_variable_assignment if check_next_token_type(:identifier)
+    nodes << parse_def if check_next_token_type(:def)
+  end
+
+  def parse_variable_assignment
+    var_name = consume(:identifier)
+    consume(:assignment_operator)
+    var_value = consume(:integer)
+    consume(:expression_terminator)
+    VarAssignmentNode.new(var_name.value, var_value.value)
+  end
+
+  def parse_def
     consume(:def)
     identifier = consume(:identifier)
     consume(:open_paren) 
@@ -52,6 +68,10 @@ class Parser
     return_value = consume_body
     consume(:end)
     DefNode.new(identifier.value, return_value.value)
+  end
+
+  def check_next_token_type(expected_type)
+    @tokens[0].type == (expected_type)
   end
 
   def consume_body
@@ -72,10 +92,20 @@ class Parser
 end
 
 DefNode = Struct.new(:name, :return_value)
+VarAssignmentNode = Struct.new(:var_name, :var_value)
 
 class Generator
-  def generate(node)
-    "function #{node.name} () { return #{node.return_value} }"
+  def generate(nodes)
+    str = ''
+    nodes.each do |node|
+        if node.is_a?(VarAssignmentNode)
+          str += "var #{node.var_name} = #{node.var_value};"
+        end
+        if node.is_a?(DefNode)
+          str += "function #{node.name} () { return #{node.return_value} }"
+        end
+    end
+    str
   end
 end
 
