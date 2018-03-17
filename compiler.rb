@@ -10,7 +10,8 @@ class Tokenizer
     [:open_paren, /\(/],
     [:close_paren, /\)/],
     [:assignment_operator, /\=/],
-    [:expression_terminator, /\;/]
+    [:expression_terminator, /\;/],
+    [:separator, /\,/]
   ] 
 
   def initialize(code)
@@ -50,6 +51,7 @@ class Parser
     nodes = []
     nodes << parse_variable_assignment if check_next_token_type(:identifier)
     nodes << parse_def if check_next_token_type(:def)
+    nodes
   end
 
   def parse_variable_assignment
@@ -72,9 +74,17 @@ class Parser
   def parse_arg_names
     consume(:open_paren)
     args = []
-    args << consume(:identifier).value if check_next_token_type(:identifier)
-    args << consume(:integer).value if check_next_token_type(:integer)
+    args = addAnyArgs(args)
     consume(:close_paren)
+    args
+  end
+
+  def addAnyArgs(args) 
+    args << consume(:identifier).value if check_next_token_type(:identifier)
+    if check_next_token_type(:separator)
+      consume(:separator)
+      addAnyArgs(args)
+    end
     args
   end
 
@@ -110,8 +120,17 @@ class Generator
           str += "var #{node.var_name} = #{node.var_value};"
         end
         if node.is_a?(DefNode)
-          str += "function #{node.name} (#{node.arg_names[0]}) { return #{node.return_value} }"
+          str += "function #{node.name} (#{args_string(node.arg_names)}) { return #{node.return_value} }"
         end
+    end
+    str
+  end
+
+  def args_string(arg_names)
+    str = ''
+    arg_names.each_with_index do |arg_name, index|
+      str += arg_name if index == 0
+      str += ", #{arg_name}" if index > 0
     end
     str
   end
