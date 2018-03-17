@@ -1,5 +1,5 @@
 x = 5;
 
-def newFunction() 
+def newFunction(y) 
   x
 end

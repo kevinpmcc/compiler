@@ -63,11 +63,19 @@ class Parser
   def parse_def
     consume(:def)
     identifier = consume(:identifier)
-    consume(:open_paren) 
-    consume(:close_paren)
+    arg_names = parse_arg_names
     return_value = consume_body
     consume(:end)
-    DefNode.new(identifier.value, return_value.value)
+    DefNode.new(identifier.value, arg_names, return_value.value)
+  end
+
+  def parse_arg_names
+    consume(:open_paren)
+    args = []
+    args << consume(:identifier).value if check_next_token_type(:identifier)
+    args << consume(:integer).value if check_next_token_type(:integer)
+    consume(:close_paren)
+    args
   end
 
   def check_next_token_type(expected_type)
@@ -91,7 +99,7 @@ class Parser
   end
 end
 
-DefNode = Struct.new(:name, :return_value)
+DefNode = Struct.new(:name, :arg_names, :return_value)
 VarAssignmentNode = Struct.new(:var_name, :var_value)
 
 class Generator
@@ -102,7 +110,7 @@ class Generator
           str += "var #{node.var_name} = #{node.var_value};"
         end
         if node.is_a?(DefNode)
-          str += "function #{node.name} () { return #{node.return_value} }"
+          str += "function #{node.name} (#{node.arg_names[0]}) { return #{node.return_value} }"
         end
     end
     str
