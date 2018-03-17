@@ -10,7 +10,6 @@ class Tokenizer
     [:open_paren, /\(/],
     [:close_paren, /\)/],
     [:assignment_operator, /\=/],
-    [:expression_terminator, /\;/],
     [:separator, /\,/]
   ] 
 
@@ -49,7 +48,8 @@ class Parser
 
   def parse
     nodes = []
-    nodes << parse_variable_assignment if check_next_token_type(:identifier)
+    nodes << parse_expression if check_next_token_type(:identifier)
+    return nodes if @tokens.empty?
     nodes << parse_def if check_next_token_type(:def)
     nodes
   end
@@ -58,7 +58,6 @@ class Parser
     var_name = consume(:identifier)
     consume(:assignment_operator)
     var_value = consume(:integer)
-    consume(:expression_terminator)
     VarAssignmentNode.new(var_name.value, var_value.value)
   end
 
@@ -76,6 +75,8 @@ class Parser
       @tokens.shift
     elsif check_next_token_type(:identifier) && @tokens[1].type == :open_paren
        parse_function_call
+    elsif check_next_token_type(:identifier) && @tokens[1].type == :assignment_operator
+       parse_variable_assignment 
     elsif check_next_token_type(:identifier) 
        @tokens.shift
     else
@@ -105,12 +106,11 @@ class Parser
     args = []
     args = addAnyArgExpressions(args)
     consume(:close_paren)
-
     args
   end
 
   def addAnyArgExpressions(args)
-    return if check_next_token_type(:close_paren)
+    return args if check_next_token_type(:close_paren)
     args << parse_expression
     if check_next_token_type(:separator)
       consume(:separator)
@@ -122,8 +122,6 @@ class Parser
   def check_next_token_type(expected_type)
     @tokens[0].type == expected_type
   end
-
- 
 
   def parse_function_call
     function_name = @tokens.shift
@@ -153,6 +151,9 @@ class Generator
         end
         if node.is_a?(DefNode)
           str += "function #{node.name} (#{args_names_string(node.arg_names)}) { return #{body_string(node.body)} }"
+        end
+        if node.is_a?(FunctionCall)
+           return body_string(node)  
         end
     end
     str
@@ -190,14 +191,14 @@ class Generator
 end
 
 
-tokens = Tokenizer.new(File.read("test.src")).tokenize
-#puts tokens.map(&:inspect).join("\n")
+# tokens = Tokenizer.new(File.read("test.src")).tokenize
+# #puts tokens.map(&:inspect).join("\n")
 
-tree = Parser.new(tokens).parse
-#puts tree
-generated =  Generator.new.generate(tree)
+# tree = Parser.new(tokens).parse
+# #puts tree
+# generated =  Generator.new.generate(tree)
 
-RUNTIME = "function add(x, y) { return x + y };"
-TEST = "console.log(newFunction(17))"
-puts [RUNTIME, generated, TEST].join("\n")
+# RUNTIME = "function add(x, y) { return x + y };"
+# TEST = "console.log(newFunction(17))"
+# puts [RUNTIME, generated, TEST].join("\n")
 
