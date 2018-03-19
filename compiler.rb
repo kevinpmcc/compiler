@@ -55,10 +55,10 @@ class Parser
   end
 
   def parse_variable_assignment
-    var_name = consume(:identifier)
+    var_name = VarRefNode.new(consume(:identifier).value)
     consume(:assignment_operator)
-    var_value = consume(:integer)
-    VarAssignmentNode.new(var_name.value, var_value.value)
+    var_value = IntegerNode.new(consume(:integer).value)
+    VarAssignmentNode.new(var_name, var_value)
   end
 
   def parse_def
@@ -72,13 +72,13 @@ class Parser
 
   def parse_expression
     if check_next_token_type(:integer) 
-      @tokens.shift
+      IntegerNode.new(consume(:integer).value)
     elsif check_next_token_type(:identifier) && @tokens[1].type == :open_paren
        parse_function_call
     elsif check_next_token_type(:identifier) && @tokens[1].type == :assignment_operator
        parse_variable_assignment 
     elsif check_next_token_type(:identifier) 
-       @tokens.shift
+      VarRefNode.new(consume(:identifier).value)
     else
       raise RuntimeError.new("expected integer or identifier but got #{@tokens[0].type}")
     end
@@ -111,7 +111,7 @@ class Parser
 
   def addAnyArgExpressions(args)
     return args if check_next_token_type(:close_paren)
-    args << parse_expression
+    args << consume(:identifier).value
     if check_next_token_type(:separator)
       consume(:separator)
       addAnyArgExpressions(args)
@@ -124,9 +124,9 @@ class Parser
   end
 
   def parse_function_call
-    function_name = @tokens.shift
+    function_name = VarRefNode.new(consume(:identifier).value)
     arg_expressions = parse_arg_expressions
-    FunctionCall.new(function_name, arg_expressions)
+    FunctionCallNode.new(function_name, arg_expressions)
   end
 
   def consume(expected_type)
@@ -140,53 +140,32 @@ end
 
 DefNode = Struct.new(:name, :arg_names, :body)
 VarAssignmentNode = Struct.new(:var_name, :var_value)
-FunctionCall = Struct.new(:name, :arg_expressions)
+FunctionCallNode = Struct.new(:name, :arg_expressions)
+IntegerNode = Struct.new(:value)
+VarRefNode = Struct.new(:value)
 
 class Generator
   def generate(nodes)
     str = ''
     nodes.each do |node|
-        if node.is_a?(VarAssignmentNode)
-          str += "var #{node.var_name} = #{node.var_value};"
-        end
-        if node.is_a?(DefNode)
-          str += "function #{node.name} (#{args_names_string(node.arg_names)}) { return #{body_string(node.body)} }"
-        end
-        if node.is_a?(FunctionCall)
-           return body_string(node)  
-        end
+      str += generate_single_node(node)
     end
     str
   end
 
-  def body_string(body)
-    if body.is_a?(FunctionCall)
-      body.name.value + '(' + args_expression_string(body.arg_expressions) + ')' if body.name
-    else
-      body.value
+  def generate_single_node(node)
+    case node
+    when VarAssignmentNode
+      "var #{generate_single_node(node.var_name)} = #{generate_single_node(node.var_value)};"
+    when DefNode
+      "function #{node.name} (#{node.arg_names.join(', ')}) { return #{generate_single_node(node.body)} }"
+    when FunctionCallNode
+      "#{generate_single_node(node.name)}(#{node.arg_expressions.join(', ')})"
+    when IntegerNode
+      node.value
+    when VarRefNode
+      node.value
     end
-  end
-
-  def args_names_string(arg_names)
-    return '' if !arg_names
-    return '' if arg_names.empty?
-    str = ''
-    arg_names.each_with_index do |arg_name, index|
-      str += arg_name if index == 0
-      str += ", #{arg_name}" if index > 0
-    end
-    str
-  end
-
-  def args_expression_string(arg_expressions)
-    return '' if !arg_expressions
-    return '' if arg_expressions.empty?
-    str = ''
-    arg_expressions.each_with_index do |arg_expression, index|
-      str += arg_expression.value if index == 0
-      str += ", #{arg_expression.value}" if index > 0
-    end
-    str
   end
 end
 
